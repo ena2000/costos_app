@@ -13,9 +13,10 @@ from PIL import Image
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config_ocr.json"
 GEMINI_MODELS = (
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-flash-latest",
 )
 
 MAQUINA_ALIASES = {
@@ -159,7 +160,7 @@ def guardar_api_key(key: str) -> None:
     guardar_config(cfg)
 
 
-def _imagen_a_base64(path: str, max_side: int = 1600) -> tuple[str, str]:
+def _imagen_a_base64(path: str, max_side: int = 1100) -> tuple[str, str]:
     img = Image.open(path)
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
@@ -169,10 +170,10 @@ def _imagen_a_base64(path: str, max_side: int = 1600) -> tuple[str, str]:
     w, h = img.size
     scale = min(1.0, max_side / max(w, h))
     if scale < 1.0:
-        img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+        img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.BILINEAR)
 
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=85)
+    img.save(buf, format="JPEG", quality=70, optimize=True)
     return base64.b64encode(buf.getvalue()).decode("ascii"), "image/jpeg"
 
 

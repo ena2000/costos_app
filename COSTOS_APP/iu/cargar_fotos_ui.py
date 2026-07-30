@@ -1,6 +1,7 @@
 """UI para cargar fotos de hojas de orden y revisar datos extraídos."""
 from __future__ import annotations
 
+import re
 import tempfile
 import threading
 import time
@@ -13,6 +14,7 @@ import qrcode
 
 from models import ocr_orden
 from models.subida_celular import SubidaCelularServer
+from models.notificaciones import notificar
 
 
 class CargarFotosDialog(tk.Toplevel):
@@ -54,12 +56,16 @@ class CargarFotosDialog(tk.Toplevel):
         )
         self.status.grid(row=1, column=0, sticky="w", padx=12)
 
-        review = ttk.LabelFrame(self, text="Datos detectados (revisa antes de aplicar)", padding=10)
+        review = ttk.LabelFrame(
+            self,
+            text="Datos detectados — PUEDES EDITARLOS aquí antes de aplicar",
+            padding=10,
+        )
         review.grid(row=2, column=0, sticky="nsew", padx=10, pady=8)
         review.columnconfigure(0, weight=1)
         review.rowconfigure(0, weight=1)
 
-        self.txt = tk.Text(review, wrap="word", font=("Consolas", 10))
+        self.txt = tk.Text(review, wrap="word", font=("Consolas", 10), undo=True)
         scroll = ttk.Scrollbar(review, orient="vertical", command=self.txt.yview)
         self.txt.configure(yscrollcommand=scroll.set)
         self.txt.grid(row=0, column=0, sticky="nsew")
@@ -218,15 +224,17 @@ class CargarFotosDialog(tk.Toplevel):
             if not ocr_orden.obtener_api_key():
                 return
 
-        self.status.config(text="Leyendo fotos… (puede tardar unos segundos)")
+        self.status.config(text="Leyendo fotos… (te aviso cuando termine)")
         self.btn_aplicar.config(state="disabled")
         self.txt.delete("1.0", tk.END)
         self.update_idletasks()
+        t0 = time.time()
 
         def worker():
             try:
                 datos = ocr_orden.extraer_datos_de_fotos(self.rutas)
-                self.after(0, lambda: self._mostrar_datos(datos))
+                segs = int(time.time() - t0)
+                self.after(0, lambda: self._mostrar_datos(datos, segs))
             except Exception as e:
                 self.after(0, lambda: self._error(str(e)))
 
@@ -234,28 +242,46 @@ class CargarFotosDialog(tk.Toplevel):
 
     def _error(self, msg: str):
         self.status.config(text="Error al leer fotos.")
+        notificar("Error al leer fotos", "Revisa el mensaje en la app.")
         messagebox.showerror("Error OCR", msg, parent=self)
 
-    def _mostrar_datos(self, datos: dict):
+    def _mostrar_datos(self, datos: dict, segundos: int = 0):
         self.datos = datos
         self.txt.delete("1.0", tk.END)
         self.txt.insert(tk.END, _formatear_resumen(datos))
-        self.status.config(text="Revisa los datos y pulsa Aplicar.")
+        self.status.config(
+            text=f"Listo en {segundos}s. Corrige lo que esté mal en el texto y luego Aplicar."
+        )
         self.btn_aplicar.config(state="normal")
+        notificar(
+            "Fotos leídas ✔",
+            f"Ya están los datos ({segundos}s). Puedes editarlos antes de aplicar.",
+        )
 
     def _aplicar(self):
-        if not self.datos:
+        if not self.datos and not self.txt.get("1.0", tk.END).strip():
             return
         try:
+            texto = self.txt.get("1.0", tk.END)
+            base = self.datos or {}
+            editados = _parsear_resumen(texto, base)
+            # Re-normaliza alias de máquinas/actividades por si editaron a mano
+            self.datos = ocr_orden.normalizar_datos(_a_raw_para_normalizar(editados))
             self.on_aplicar(self.datos)
+            notificar("Orden cargada ✔", "Datos aplicados (con tus correcciones).")
             messagebox.showinfo(
                 "Aplicado",
-                "Datos cargados en la orden.\nRevisa las pestañas y corrige si hace falta.",
+                "Datos cargados en la orden.\nRevisa las pestañas por si falta algo.",
                 parent=self,
             )
             self._cerrar()
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudieron aplicar los datos:\n{e}", parent=self)
+            messagebox.showerror(
+                "Error",
+                f"No se pudieron aplicar los datos.\n"
+                f"Revisa el formato del texto editado.\n\n{e}",
+                parent=self,
+            )
 
     def _cerrar(self):
         if self._poll_job is not None:
@@ -339,6 +365,196 @@ def _formatear_resumen(d: dict) -> str:
         lineas.append("(ninguno)")
 
     return "\n".join(lineas)
+
+
+def _a_raw_para_normalizar(d: dict) -> dict:
+    """Convierte el dict editado al formato que espera normalizar_datos."""
+    return {
+        "cliente": d.get("cliente"),
+        "trabajo": d.get("trabajo"),
+        "cantidad_item": d.get("cantidad_item") or 1,
+        "fecha_inicio": d.get("fecha_inicio"),
+        "fecha_fin": d.get("fecha_fin"),
+        "medidas_tinta": d.get("medidas_tinta") or [],
+        "maquina_tinta": d.get("maquina_tinta"),
+        "maquinarias": d.get("maquinarias") or [],
+        "mano_obra": d.get("mano_obra") or [],
+        "instalacion": d.get("instalacion") or {},
+        "materiales": d.get("materiales") or [],
+    }
+
+
+def _parsear_resumen(texto: str, base: dict | None = None) -> dict:
+    """Lee el texto editable y arma el dict de datos (respeta lo que el usuario cambió)."""
+    base = dict(base or {})
+    out = {
+        "cliente": base.get("cliente") or "",
+        "trabajo": base.get("trabajo") or "",
+        "cantidad_item": base.get("cantidad_item") or 1,
+        "fecha_inicio": base.get("fecha_inicio") or "",
+        "fecha_fin": base.get("fecha_fin") or "",
+        "disenador": base.get("disenador") or "XAVIER CABRERA",
+        "maquina_tinta": base.get("maquina_tinta") or "ORISS",
+        "medidas_tinta": [],
+        "maquinarias": [],
+        "mano_obra": [],
+        "instalacion": {
+            "cantidad_operarios": 0,
+            "viaticos": 0.0,
+            "dias": [],
+        },
+        "materiales": [],
+    }
+
+    seccion = "cabecera"
+    for raw in texto.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        up = line.upper()
+
+        if up.startswith("=== TINTA"):
+            seccion = "tinta"
+            continue
+        if up.startswith("=== MAQUINARIA"):
+            seccion = "maquinaria"
+            continue
+        if up.startswith("=== MANO DE OBRA"):
+            seccion = "mano_obra"
+            continue
+        if up.startswith("=== INSTAL"):
+            seccion = "instalacion"
+            continue
+        if up.startswith("=== MATERIAL"):
+            seccion = "materiales"
+            continue
+
+        if seccion == "cabecera":
+            if line.lower().startswith("cliente:"):
+                out["cliente"] = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("trabajo:"):
+                out["trabajo"] = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("inicio:"):
+                # Inicio: 22/06   Fin: 24/06
+                m = re.search(
+                    r"Inicio:\s*(\S+)\s+Fin:\s*(\S+)",
+                    line,
+                    re.IGNORECASE,
+                )
+                if m:
+                    out["fecha_inicio"] = m.group(1)
+                    out["fecha_fin"] = m.group(2)
+            elif "diseñador" in line.lower() or "disenador" in line.lower():
+                out["disenador"] = line.split(":", 1)[1].strip()
+            continue
+
+        if seccion == "tinta":
+            if line.lower().startswith("máquina:") or line.lower().startswith("maquina:"):
+                out["maquina_tinta"] = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("medida"):
+                # Medida 1: 2x  30.0 x 10.0 cm (doble cara)
+                m = re.search(
+                    r"(\d+)\s*x\s*([\d.,]+)\s*x\s*([\d.,]+)",
+                    line,
+                    re.IGNORECASE,
+                )
+                if m:
+                    out["medidas_tinta"].append({
+                        "repeticiones": int(m.group(1)),
+                        "largo_cm": float(m.group(2).replace(",", ".")),
+                        "ancho_cm": float(m.group(3).replace(",", ".")),
+                        "doble_cara": "doble" in line.lower(),
+                    })
+            continue
+
+        if seccion == "maquinaria":
+            if line.startswith("Total") or line.startswith("("):
+                continue
+            # - ORISS: 15:00 → 15:15  (24/06)
+            m = re.search(
+                r"-?\s*(.+?):\s*(\d{1,2}:\d{2})\s*(?:→|->|–|-)\s*(\d{1,2}:\d{2})(?:\s*\(([^)]+)\))?",
+                line,
+            )
+            if m:
+                out["maquinarias"].append({
+                    "maquina": m.group(1).strip(),
+                    "hora_inicio": m.group(2),
+                    "hora_fin": m.group(3),
+                    "fecha": (m.group(4) or "").strip(),
+                    "responsable": "",
+                })
+            continue
+
+        if seccion == "mano_obra":
+            if line.startswith("("):
+                continue
+            # - REFILACION: 10:40 → 10:50 | operarios=1 (Kevin)
+            m = re.search(
+                r"-?\s*(.+?):\s*(\d{1,2}:\d{2})\s*(?:→|->|–|-)\s*(\d{1,2}:\d{2})"
+                r"(?:\s*\|\s*operarios\s*=\s*(\d+))?"
+                r"(?:\s*\(([^)]*)\))?",
+                line,
+                re.IGNORECASE,
+            )
+            if m:
+                noms = [n.strip() for n in (m.group(5) or "").split(",") if n.strip()]
+                ops = int(m.group(4) or (len(noms) if noms else 1))
+                if not noms and ops:
+                    noms = [f"Operario {i+1}" for i in range(ops)]
+                out["mano_obra"].append({
+                    "actividad": m.group(1).strip(),
+                    "hora_inicio": m.group(2),
+                    "hora_fin": m.group(3),
+                    "fecha": "",
+                    "responsables": noms,
+                    "cantidad_operarios": ops,
+                })
+            continue
+
+        if seccion == "instalacion":
+            if line.lower().startswith("operarios:"):
+                m = re.search(
+                    r"Operarios:\s*(\d+)\s*Viáticos:\s*([\d.,]+)",
+                    line,
+                    re.IGNORECASE,
+                )
+                if m:
+                    out["instalacion"]["cantidad_operarios"] = int(m.group(1))
+                    out["instalacion"]["viaticos"] = float(m.group(2).replace(",", "."))
+            elif line.startswith("-"):
+                m = re.search(
+                    r"(\d{1,2}:\d{2})\s*(?:→|->|–|-)\s*(\d{1,2}:\d{2})",
+                    line,
+                )
+                if m:
+                    out["instalacion"]["dias"].append({
+                        "hora_inicio": m.group(1),
+                        "hora_fin": m.group(2),
+                    })
+            continue
+
+        if seccion == "materiales":
+            if line.startswith("("):
+                continue
+            # - PRODUCTO: cant=1.0 m. | unit=$1.47 | sub=$1.47
+            m = re.search(
+                r"-?\s*(.+?):\s*cant\s*=\s*([\d.,]+)\s*(\S*)\s*\|\s*unit\s*=\s*\$?\s*([\d.,]+)"
+                r"\s*\|\s*sub\s*=\s*\$?\s*([\d.,]+)",
+                line,
+                re.IGNORECASE,
+            )
+            if m:
+                out["materiales"].append({
+                    "codigo": "",
+                    "producto": m.group(1).strip(),
+                    "cantidad": float(m.group(2).replace(",", ".")),
+                    "unidad": (m.group(3) or "u").strip(),
+                    "costo_unitario": float(m.group(4).replace(",", ".")),
+                    "subtotal": float(m.group(5).replace(",", ".")),
+                })
+            continue
+
+    return out
 
 
 def aplicar_datos_a_app(app, datos: dict) -> None:
