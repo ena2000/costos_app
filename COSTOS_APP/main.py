@@ -2,7 +2,6 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from ttkthemes import ThemedTk
 from datetime import datetime
-import re
 
 # Importación de interfaces (UI)
 from iu.costo_maquinaria_ui import CostoMaquinariaUI
@@ -21,7 +20,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Calculadora de Costos - PUBLISTIK")
-        self.root.geometry("950x720") 
+        self.root.geometry("950x700") 
 
         database.crear_tablas()
 
@@ -39,24 +38,20 @@ class App:
         datos_orden_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
 
         ttk.Label(datos_orden_frame, text="Cliente:").grid(row=0, column=0, padx=5, sticky="w")
-        self.entry_cliente = ttk.Entry(datos_orden_frame, width=28)
+        self.entry_cliente = ttk.Entry(datos_orden_frame, width=30)
         self.entry_cliente.grid(row=0, column=1, padx=5, pady=5)
 
-        ttk.Label(datos_orden_frame, text="Producto:").grid(row=0, column=2, padx=5, sticky="w")
-        self.entry_desc = ttk.Entry(datos_orden_frame, width=28)
+        ttk.Label(datos_orden_frame, text="Trabajo:").grid(row=0, column=2, padx=5, sticky="w")
+        self.entry_desc = ttk.Entry(datos_orden_frame, width=40)
         self.entry_desc.grid(row=0, column=3, padx=5, pady=5)
 
-        ttk.Label(datos_orden_frame, text="Cantidad:").grid(row=0, column=4, padx=5, sticky="w")
-        self.entry_cantidad = ttk.Entry(datos_orden_frame, width=8)
-        self.entry_cantidad.grid(row=0, column=5, padx=5, pady=5)
-
         fecha_actual = datetime.now().strftime("%d/%m/%Y")
-        ttk.Label(datos_orden_frame, text="Fecha Ini:").grid(row=1, column=0, padx=5, sticky="w")
+        ttk.Label(datos_orden_frame, text="Inicio:").grid(row=1, column=0, padx=5, sticky="w")
         self.entry_fecha_inicio = ttk.Entry(datos_orden_frame, width=15)
         self.entry_fecha_inicio.insert(0, fecha_actual)
         self.entry_fecha_inicio.grid(row=1, column=1, padx=5, pady=5, sticky="w")
 
-        ttk.Label(datos_orden_frame, text="Fecha Fin:").grid(row=1, column=2, padx=5, sticky="w")
+        ttk.Label(datos_orden_frame, text="Fin:").grid(row=1, column=2, padx=5, sticky="w")
         self.entry_fecha_fin = ttk.Entry(datos_orden_frame, width=15)
         self.entry_fecha_fin.insert(0, fecha_actual)
         self.entry_fecha_fin.grid(row=1, column=3, padx=5, pady=5, sticky="w")
@@ -91,42 +86,13 @@ class App:
         btn_frame.grid(row=2, column=0, sticky="ew")
 
         ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self.limpiar_todo).pack(side="right", padx=5)
-        ttk.Button(
-            btn_frame,
-            text="📋 Copiar desglose costos",
-            command=self.copiar_resultado,
-        ).pack(side="right", padx=5)
-        ttk.Button(
-            btn_frame,
-            text="📋 Copiar datos orden (CLIENTE/FECHAS)",
-            command=self.copiar_datos_orden,
-        ).pack(side="right", padx=5)
+        ttk.Button(btn_frame, text="📋 Copiar para Excel", command=self.copiar_resultado).pack(side="right", padx=5)
 
         ttk.Button(btn_frame, text="📷 Cargar fotos de orden", command=self.abrir_cargar_fotos).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="💾 FINALIZAR Y GUARDAR", command=self.ejecutar_finalizado_completo).pack(side="left", padx=5)
 
     def abrir_cargar_fotos(self):
-        def al_aplicar(datos):
-            aplicar_datos_a_app(self, datos)
-            self.root.after(150, self._ofrecer_copiar_excel)
-
-        CargarFotosDialog(self.root, on_aplicar=al_aplicar)
-
-    def _ofrecer_copiar_excel(self):
-        # Primero datos de cabecera (tabla CLIENTE/PRODUCTO/...), luego desglose
-        if messagebox.askyesno(
-            "Copiar a Excel",
-            "Datos cargados.\n\n"
-            "1) ¿Copiar datos de orden (Cliente, Producto, Cantidad, Fechas)\n"
-            "   para pegar en la tablita de arriba?",
-        ):
-            self.copiar_datos_orden()
-        if messagebox.askyesno(
-            "Copiar a Excel",
-            "2) ¿Copiar también el desglose de costos\n"
-            "   (maquinaria, mano de obra, materiales, tinta)?",
-        ):
-            self.copiar_resultado()
+        CargarFotosDialog(self.root, on_aplicar=lambda datos: aplicar_datos_a_app(self, datos))
 
     def ejecutar_finalizado_completo(self):
         if not self.entry_cliente.get().strip():
@@ -162,49 +128,6 @@ class App:
             messagebox.showinfo("Éxito", "Orden guardada en el historial.")
         except Exception as e:
             messagebox.showerror("Error", f"Error al guardar: {e}")
-
-    def _producto_y_cantidad(self):
-        """Separa producto limpio y cantidad para la tablita de Excel."""
-        trabajo = (self.entry_desc.get() or "").strip()
-        cant = (self.entry_cantidad.get() or "").strip()
-        producto = trabajo
-
-        if not cant:
-            m = re.match(r"^(\d+)\s+(.+)$", trabajo)
-            if m:
-                cant = m.group(1)
-                producto = m.group(2).strip()
-        elif cant:
-            # Quitar la cantidad del inicio del texto de producto si viene repetida
-            producto = re.sub(rf"^{re.escape(cant)}\s+", "", trabajo).strip() or trabajo
-
-        if not cant:
-            cant = "1"
-        return producto, cant
-
-    def obtener_datos_orden_excel(self):
-        """Formato de la tablita superior: CLIENTE/PRODUCTO/CANTIDAD/FECHAS."""
-        producto, cantidad = self._producto_y_cantidad()
-        return (
-            f"CLIENTE\t{(self.entry_cliente.get() or '').strip()}\n"
-            f"PRODUCTO\t{producto}\n"
-            f"CANTIDAD\t{cantidad}\n"
-            f"FECHA INI\t{(self.entry_fecha_inicio.get() or '').strip()}\n"
-            f"FECHA FIN\t{(self.entry_fecha_fin.get() or '').strip()}\n"
-        )
-
-    def copiar_datos_orden(self, silencioso=False):
-        """Copia solo la tablita de datos de orden (sin utilidad/margen)."""
-        res = self.obtener_datos_orden_excel()
-        self.root.clipboard_clear()
-        self.root.clipboard_append(res)
-        self.root.update()
-        if not silencioso:
-            messagebox.showinfo(
-                "Copiado",
-                "Datos de orden copiados.\n\n"
-                "En Excel: selecciona la celda CLIENTE (ej. A3) y pega con Ctrl+V.",
-            )
 
     def obtener_resultados(self):
         """Genera el texto con el formato exacto para pegar en Excel."""
@@ -259,7 +182,7 @@ class App:
             messagebox.showinfo(
                 "Copiado",
                 "Listo. Ya está en el portapapeles.\n\n"
-                "Pega en Excel con Ctrl+V en la hoja de costo de la orden.",
+                "Pega en Excel con Ctrl+V.",
             )
 
     def formato_coma(self, n):
@@ -269,7 +192,6 @@ class App:
         if messagebox.askyesno("Limpiar", "¿Borrar todos los datos?"):
             self.entry_cliente.delete(0, tk.END)
             self.entry_desc.delete(0, tk.END)
-            self.entry_cantidad.delete(0, tk.END)
             self.maquinaria_ui.limpiar_campos()
             self.mano_obra_ui.limpiar_campos()
             self.tinta_ui.limpiar_campos()

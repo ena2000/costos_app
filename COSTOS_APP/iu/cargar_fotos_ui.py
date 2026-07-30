@@ -1,7 +1,6 @@
 """UI para cargar fotos de hojas de orden y revisar datos extraídos."""
 from __future__ import annotations
 
-import re
 import threading
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
@@ -135,6 +134,11 @@ class CargarFotosDialog(tk.Toplevel):
             return
         try:
             self.on_aplicar(self.datos)
+            messagebox.showinfo(
+                "Aplicado",
+                "Datos cargados en la orden.\nRevisa las pestañas y corrige si hace falta.",
+                parent=self,
+            )
             self.destroy()
         except Exception as e:
             messagebox.showerror("Error", f"No se pudieron aplicar los datos:\n{e}", parent=self)
@@ -213,24 +217,8 @@ def aplicar_datos_a_app(app, datos: dict) -> None:
     # Cabecera
     app.entry_cliente.delete(0, tk.END)
     app.entry_cliente.insert(0, datos.get("cliente") or "")
-
-    trabajo = (datos.get("trabajo") or "").strip()
-    cant = datos.get("cantidad_item")
-    producto = trabajo
-    if cant:
-        producto = re.sub(rf"^{re.escape(str(cant))}\s+", "", trabajo).strip() or trabajo
-    elif trabajo:
-        m = re.match(r"^(\d+)\s+(.+)$", trabajo)
-        if m:
-            cant = m.group(1)
-            producto = m.group(2).strip()
-
     app.entry_desc.delete(0, tk.END)
-    app.entry_desc.insert(0, producto)
-    if hasattr(app, "entry_cantidad"):
-        app.entry_cantidad.delete(0, tk.END)
-        app.entry_cantidad.insert(0, str(cant or "1"))
-
+    app.entry_desc.insert(0, datos.get("trabajo") or "")
     if datos.get("fecha_inicio"):
         app.entry_fecha_inicio.delete(0, tk.END)
         app.entry_fecha_inicio.insert(0, datos["fecha_inicio"])
