@@ -173,8 +173,9 @@ class CargarFotosDialog(tk.Toplevel):
 
         ttk.Label(
             win,
-            text="3. Toma o elige las fotos → Enviar a la laptop\n"
-                 "4. Verás las fotos en la lista. Luego pulsa Leer fotos.",
+            text="3. En el celular: ve agregando fotos una a una\n"
+                 "   (se guardan en la página). Al final: Enviar todas.\n"
+                 "4. Aquí aparecen en la lista → Leer fotos.",
             justify="center",
         ).pack(padx=16, pady=8)
 

@@ -115,6 +115,12 @@ Reglas:
   * Si hay horas en 2, 3 o más máquinas, DEBES devolver TODAS en el array "maquinarias" (una entrada por cada fila con hora inicio y hora fin).
   * No te quedes solo con la primera máquina encontrada.
 - En mano_obra, lista cada nombre de RESPONSABLES por separado; si hay varios nombres, ponlos todos en el array.
+- MUY IMPORTANTE mano_obra: si hay VARIAS actividades marcadas (REFILACION, BRANDEO, PEGADO, etc.),
+  incluye TODAS en el array "mano_obra", cada una con su propia fecha, hora_inicio, hora_fin y responsables.
+  No te quedes solo con la primera. Cada actividad puede tener horas distintas y distinta cantidad de operarios
+  (cantidad = cuántos nombres hay en RESPONSABLES).
+  Si UNA misma actividad tiene DOS O MÁS intervalos de hora (ej. 08:00-09:00 y luego 14:00-15:30),
+  crea UNA entrada por cada intervalo en "mano_obra" (mismo nombre de actividad, horas distintas).
 - Si hay VARIAS medidas de impresión/señaléticas (ej. 30x10 y 60x60), incluye TODAS en medidas_tinta.
 - Preferir medidas del trabajo (ej. 140x55cm), no el ancho del rollo de vinil.
 - repeticiones = cantidad de esa medida (si dice 2 de 30x10, repeticiones=2).

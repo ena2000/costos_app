@@ -19,71 +19,155 @@ HTML_PAGE = """<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
 <title>Subir fotos · COSTOS</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f4f6f8; color: #1a1a1a; }
-  h1 { font-size: 1.3rem; margin: 0 0 8px; }
-  p { color: #555; margin: 0 0 16px; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; background: #f4f6f8; color: #1a1a1a; }
+  h1 { font-size: 1.25rem; margin: 0 0 6px; }
+  p { color: #555; margin: 0 0 14px; line-height: 1.35; }
   .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
   button, label.btn {
-    display: block; width: 100%; box-sizing: border-box; margin: 10px 0;
+    display: block; width: 100%; box-sizing: border-box; margin: 8px 0;
     padding: 14px; font-size: 1rem; border: 0; border-radius: 10px;
     background: #1f6feb; color: #fff; text-align: center; cursor: pointer;
   }
-  label.btn.secondary { background: #57606a; }
+  button.secondary, label.btn.secondary { background: #57606a; }
+  button.send { background: #1a7f37; font-weight: 600; }
+  button:disabled { opacity: .45; }
   input[type=file] { display: none; }
-  #status { margin-top: 12px; font-size: .95rem; white-space: pre-wrap; }
+  #status { margin-top: 10px; font-size: .95rem; white-space: pre-wrap; }
   .ok { color: #1a7f37; }
   .err { color: #cf222e; }
+  #count { font-weight: 600; margin: 8px 0 4px; }
+  #gallery {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin: 10px 0 6px;
+  }
+  .thumb {
+    position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+    background: #eaeef2;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb button {
+    position: absolute; top: 4px; right: 4px; width: 28px; height: 28px;
+    margin: 0; padding: 0; border-radius: 50%; background: rgba(0,0,0,.65);
+    font-size: 14px; line-height: 28px;
+  }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Fotos de la orden</h1>
-    <p>Celular y laptop en la misma WiFi. Puedes tomar foto o elegir de la galería.</p>
+    <p>Ve tomando o eligiendo fotos. Se van guardando aquí. Cuando tengas todas, envíalas de una vez.</p>
+
     <label class="btn">
-      Tomar / elegir fotos
+      📷 Tomar / agregar foto
       <input id="files" type="file" accept="image/*" capture="environment" multiple/>
     </label>
-    <button id="send" type="button">Enviar a la laptop</button>
+    <label class="btn secondary">
+      🖼️ Agregar de galería
+      <input id="galleryPick" type="file" accept="image/*" multiple/>
+    </label>
+
+    <div id="count">0 fotos listas</div>
+    <div id="gallery"></div>
+
+    <button id="send" class="send" type="button" disabled>Enviar todas a la laptop</button>
+    <button id="clear" class="secondary" type="button">Vaciar lista</button>
     <div id="status"></div>
   </div>
 <script>
 const statusEl = document.getElementById('status');
-const input = document.getElementById('files');
-document.getElementById('send').onclick = async () => {
-  const files = input.files;
-  if (!files || !files.length) {
-    statusEl.className = 'err';
-    statusEl.textContent = 'Elige al menos una foto.';
-    return;
-  }
-  statusEl.className = '';
-  statusEl.textContent = 'Enviando ' + files.length + ' foto(s)...';
-  const images = [];
+const countEl = document.getElementById('count');
+const galleryEl = document.getElementById('gallery');
+const sendBtn = document.getElementById('send');
+const pending = []; // { name, data, previewUrl }
+
+function refresh() {
+  countEl.textContent = pending.length + (pending.length === 1 ? ' foto lista' : ' fotos listas');
+  sendBtn.disabled = pending.length === 0;
+  galleryEl.innerHTML = '';
+  pending.forEach((item, idx) => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    const img = document.createElement('img');
+    img.src = item.previewUrl;
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '×';
+    del.onclick = () => {
+      URL.revokeObjectURL(item.previewUrl);
+      pending.splice(idx, 1);
+      refresh();
+    };
+    div.appendChild(img);
+    div.appendChild(del);
+    galleryEl.appendChild(div);
+  });
+}
+
+async function addFiles(fileList) {
+  const files = Array.from(fileList || []);
   for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
     const b64 = await new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => resolve(String(r.result).split(',')[1]);
       r.onerror = reject;
       r.readAsDataURL(f);
     });
-    images.push({ name: f.name || ('foto_' + Date.now() + '.jpg'), data: b64 });
+    pending.push({
+      name: f.name || ('foto_' + Date.now() + '.jpg'),
+      data: b64,
+      previewUrl: URL.createObjectURL(f),
+    });
   }
+  refresh();
+  statusEl.className = '';
+  statusEl.textContent = files.length ? 'Agregada(s). Sigue tomando más o envía todas.' : '';
+}
+
+document.getElementById('files').addEventListener('change', (e) => {
+  addFiles(e.target.files);
+  e.target.value = '';
+});
+document.getElementById('galleryPick').addEventListener('change', (e) => {
+  addFiles(e.target.files);
+  e.target.value = '';
+});
+
+document.getElementById('clear').onclick = () => {
+  pending.forEach(p => URL.revokeObjectURL(p.previewUrl));
+  pending.length = 0;
+  refresh();
+  statusEl.textContent = '';
+};
+
+sendBtn.onclick = async () => {
+  if (!pending.length) return;
+  statusEl.className = '';
+  statusEl.textContent = 'Enviando ' + pending.length + ' foto(s)...';
+  sendBtn.disabled = true;
   try {
     const res = await fetch('/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images })
+      body: JSON.stringify({
+        images: pending.map(p => ({ name: p.name, data: p.data }))
+      })
     });
     const txt = await res.text();
     if (!res.ok) throw new Error(txt || res.status);
     statusEl.className = 'ok';
-    statusEl.textContent = 'Listo. Ya están en la laptop.\\nPuedes enviar más o volver a la app.';
-    input.value = '';
+    statusEl.textContent = 'Listo. Las ' + pending.length + ' fotos ya están en la laptop.';
+    pending.forEach(p => URL.revokeObjectURL(p.previewUrl));
+    pending.length = 0;
+    refresh();
   } catch (e) {
     statusEl.className = 'err';
     statusEl.textContent = 'Error: ' + e.message;
+    sendBtn.disabled = pending.length === 0;
   }
 };
+
+refresh();
 </script>
 </body>
 </html>
