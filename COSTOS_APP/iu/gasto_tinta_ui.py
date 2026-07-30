@@ -283,8 +283,8 @@ class GastoTintaUI:
         self.result_text.delete(1.0, tk.END)
         self.result_text.config(state="disabled")
 
-    def cargar_desde_datos(self, maquina: str, medida: dict):
-        """Carga máquina y medida de tinta desde OCR."""
+    def cargar_desde_datos(self, maquina: str, medidas):
+        """Carga máquina y una o varias medidas de tinta desde OCR."""
         self.limpiar_para_carga()
         valores = list(self.combo_maquina["values"])
         if maquina in valores:
@@ -292,21 +292,25 @@ class GastoTintaUI:
         else:
             self.combo_maquina.current(0)
 
-        largo = float(medida.get("largo_cm") or 0)
-        ancho = float(medida.get("ancho_cm") or 0)
-        if largo <= 0 or ancho <= 0:
+        if isinstance(medidas, dict):
+            medidas = [medidas]
+        medidas = [
+            m for m in (medidas or [])
+            if float(m.get("largo_cm") or 0) > 0 and float(m.get("ancho_cm") or 0) > 0
+        ]
+        if not medidas:
             return
 
-        reps = int(medida.get("repeticiones") or 1)
-        doble = bool(medida.get("doble_cara") or False)
-
-        self.entry_total_medidas.insert(0, "1")
+        self.entry_total_medidas.insert(0, str(len(medidas)))
         self.generar_formulario_medidas()
-        if not self.inputs_medidas:
+        if len(self.inputs_medidas) != len(medidas):
             return
-        entry_rep, entry_largo, entry_ancho, entry_alto, var_doble = self.inputs_medidas[0]
-        entry_rep.insert(0, str(reps))
-        entry_largo.insert(0, str(largo))
-        entry_ancho.insert(0, str(ancho))
-        var_doble.set(doble)
+
+        for i, medida in enumerate(medidas):
+            entry_rep, entry_largo, entry_ancho, entry_alto, var_doble = self.inputs_medidas[i]
+            entry_rep.insert(0, str(int(medida.get("repeticiones") or 1)))
+            entry_largo.insert(0, str(medida.get("largo_cm")))
+            entry_ancho.insert(0, str(medida.get("ancho_cm")))
+            var_doble.set(bool(medida.get("doble_cara") or False))
+
         self.calcular()

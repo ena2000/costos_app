@@ -150,11 +150,17 @@ def _formatear_resumen(d: dict) -> str:
         "=== TINTA ===",
         f"Máquina: {d.get('maquina_tinta')}",
     ]
-    m = d.get("medida_tinta") or {}
-    lineas.append(
-        f"Medida: {m.get('repeticiones')}x  {m.get('largo_cm')} x {m.get('ancho_cm')} cm"
-        + (" (doble cara)" if m.get("doble_cara") else "")
-    )
+    medidas = d.get("medidas_tinta") or []
+    if not medidas and d.get("medida_tinta"):
+        medidas = [d["medida_tinta"]]
+    if medidas:
+        for i, m in enumerate(medidas, 1):
+            lineas.append(
+                f"Medida {i}: {m.get('repeticiones')}x  {m.get('largo_cm')} x {m.get('ancho_cm')} cm"
+                + (" (doble cara)" if m.get("doble_cara") else "")
+            )
+    else:
+        lineas.append("Medidas: (ninguna)")
     lineas.append("")
     lineas.append("=== MAQUINARIA ===")
     for item in d.get("maquinarias") or []:
@@ -230,10 +236,13 @@ def aplicar_datos_a_app(app, datos: dict) -> None:
         datos.get("instalacion") or {},
     )
 
-    # Tinta
+    # Tinta (una o varias medidas)
+    medidas = datos.get("medidas_tinta") or []
+    if not medidas and datos.get("medida_tinta"):
+        medidas = [datos["medida_tinta"]]
     app.tinta_ui.cargar_desde_datos(
         datos.get("maquina_tinta") or "ORISS",
-        datos.get("medida_tinta") or {},
+        medidas,
     )
 
     # Materiales

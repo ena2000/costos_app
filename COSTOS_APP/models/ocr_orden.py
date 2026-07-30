@@ -87,7 +87,9 @@ Devuelve SOLO un JSON válido (sin markdown) con esta estructura exacta:
   "cantidad_item": 1,
   "fecha_inicio": "DD/MM/YYYY o DD-mes",
   "fecha_fin": "DD/MM/YYYY o DD-mes",
-  "medida_tinta": {"largo_cm": 0, "ancho_cm": 0, "repeticiones": 1, "doble_cara": false},
+  "medidas_tinta": [
+    {"largo_cm": 0, "ancho_cm": 0, "repeticiones": 1, "doble_cara": false}
+  ],
   "maquina_tinta": "",
   "maquinarias": [
     {"maquina": "", "hora_inicio": "HH:MM", "hora_fin": "HH:MM", "fecha": "", "responsable": ""}
@@ -108,7 +110,9 @@ Devuelve SOLO un JSON válido (sin markdown) con esta estructura exacta:
 Reglas:
 - Solo incluye maquinarias/mano_obra con horas reales escritas (no filas vacías).
 - En mano_obra, lista cada nombre de RESPONSABLES por separado; si hay varios nombres, ponlos todos en el array.
-- Preferir medidas del trabajo (ej. 140x55cm) para medida_tinta, no el ancho del rollo de vinil.
+- Si hay VARIAS medidas de impresión/señaléticas (ej. 30x10 y 60x60), incluye TODAS en medidas_tinta.
+- Preferir medidas del trabajo (ej. 140x55cm), no el ancho del rollo de vinil.
+- repeticiones = cantidad de esa medida (si dice 2 de 30x10, repeticiones=2).
 - maquina_tinta = máquina de impresión usada (ORISS, GALAXY, CAMA PLANA, MIMAKI, 320).
 - materiales: preferir el egreso de inventario Contifico (producto, cantidad, costo unitario, subtotal).
 - Si un dato no aparece, usa null, 0 o [].
@@ -232,12 +236,14 @@ def datos_ejemplo_segarvi() -> dict:
         "cantidad_item": 1,
         "fecha_inicio": "22-jun",
         "fecha_fin": "24-jun",
-        "medida_tinta": {
-            "largo_cm": 140,
-            "ancho_cm": 55,
-            "repeticiones": 1,
-            "doble_cara": False,
-        },
+        "medidas_tinta": [
+            {
+                "largo_cm": 140,
+                "ancho_cm": 55,
+                "repeticiones": 1,
+                "doble_cara": False,
+            }
+        ],
         "maquina_tinta": "ORISS",
         "maquinarias": [
             {
@@ -371,7 +377,33 @@ def _norm_fecha(valor) -> str:
 
 
 def normalizar_datos(raw: dict) -> dict:
-    medida = raw.get("medida_tinta") or {}
+    # Soporta lista medidas_tinta o el formato viejo medida_tinta (una sola)
+    medidas_raw = raw.get("medidas_tinta")
+    if not medidas_raw:
+        una = raw.get("medida_tinta")
+        medidas_raw = [una] if una else []
+    if isinstance(medidas_raw, dict):
+        medidas_raw = [medidas_raw]
+
+    medidas_tinta = []
+    for med in medidas_raw:
+        if not isinstance(med, dict):
+            continue
+        try:
+            largo = float(med.get("largo_cm") or 0)
+            ancho = float(med.get("ancho_cm") or 0)
+            reps = int(med.get("repeticiones") or 1)
+        except (TypeError, ValueError):
+            continue
+        if largo <= 0 or ancho <= 0:
+            continue
+        medidas_tinta.append({
+            "largo_cm": largo,
+            "ancho_cm": ancho,
+            "repeticiones": max(1, reps),
+            "doble_cara": bool(med.get("doble_cara") or False),
+        })
+
     maquinarias = []
     for item in raw.get("maquinarias") or []:
         maq = _map_maquina(item.get("maquina"))
@@ -445,7 +477,6 @@ def normalizar_datos(raw: dict) -> dict:
 
     maquina_tinta = _map_tinta(raw.get("maquina_tinta"))
     if not maquina_tinta and maquinarias:
-        # Si imprimieron en una máquina de tinta conocida, úsala
         for m in maquinarias:
             t = _map_tinta(m["maquina"].replace("MAQUINA ", ""))
             if t:
@@ -467,12 +498,7 @@ def normalizar_datos(raw: dict) -> dict:
         "cantidad_item": cant,
         "fecha_inicio": _norm_fecha(raw.get("fecha_inicio")),
         "fecha_fin": _norm_fecha(raw.get("fecha_fin")),
-        "medida_tinta": {
-            "largo_cm": float(medida.get("largo_cm") or 0),
-            "ancho_cm": float(medida.get("ancho_cm") or 0),
-            "repeticiones": int(medida.get("repeticiones") or 1),
-            "doble_cara": bool(medida.get("doble_cara") or False),
-        },
+        "medidas_tinta": medidas_tinta,
         "maquina_tinta": maquina_tinta or "ORISS",
         "maquinarias": maquinarias,
         "mano_obra": mano_obra,
