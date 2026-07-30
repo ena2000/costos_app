@@ -189,3 +189,41 @@ class CostoMaterialesUI:
     def formato_coma(self, numero):
         """Formatea números al estilo local (coma decimal)."""
         return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def cargar_desde_datos(self, materiales: list):
+        """Carga materiales del egreso (producto, cantidad, costo, subtotal)."""
+        for mat in materiales:
+            producto = (mat.get("producto") or "").strip()
+            if not producto:
+                continue
+            cantidad = float(mat.get("cantidad") or 0)
+            unidad = mat.get("unidad") or "u"
+            costo_unitario = float(mat.get("costo_unitario") or 0)
+            subtotal = float(mat.get("subtotal") or 0)
+            if subtotal <= 0:
+                subtotal = round(cantidad * costo_unitario, 2)
+            if cantidad <= 0 and subtotal <= 0:
+                continue
+            if costo_unitario <= 0 and cantidad > 0 and subtotal > 0:
+                costo_unitario = round(subtotal / cantidad, 6)
+
+            values = (
+                self.formato_coma(cantidad),
+                unidad,
+                producto,
+                f"${self.formato_coma(costo_unitario)}",
+                f"${self.formato_coma(subtotal)}",
+            )
+            item_id = self.materials_treeview.insert("", tk.END, values=values)
+            self.materials_treeview.item(
+                item_id,
+                tags=(
+                    str(subtotal),
+                    self.formato_coma(cantidad),
+                    unidad,
+                    producto,
+                    self.formato_coma(subtotal),
+                ),
+            )
+        self._actualizar_total_y_formato()
+

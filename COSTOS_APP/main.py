@@ -10,6 +10,7 @@ from iu.gasto_tinta_ui import GastoTintaUI
 from iu.costo_materiales_ui import CostoMaterialesUI
 from iu.inventario_ui import InventarioUI
 from iu.historial_ui import HistorialUI
+from iu.cargar_fotos_ui import CargarFotosDialog, aplicar_datos_a_app
 
 # Importación de modelos y base de datos
 from models import database
@@ -86,8 +87,12 @@ class App:
 
         ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self.limpiar_todo).pack(side="right", padx=5)
         ttk.Button(btn_frame, text="📋 Copiar para Excel", command=self.copiar_resultado).pack(side="right", padx=5)
-        
+
+        ttk.Button(btn_frame, text="📷 Cargar fotos de orden", command=self.abrir_cargar_fotos).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="💾 FINALIZAR Y GUARDAR", command=self.ejecutar_finalizado_completo).pack(side="left", padx=5)
+
+    def abrir_cargar_fotos(self):
+        CargarFotosDialog(self.root, on_aplicar=lambda datos: aplicar_datos_a_app(self, datos))
 
     def ejecutar_finalizado_completo(self):
         if not self.entry_cliente.get().strip():

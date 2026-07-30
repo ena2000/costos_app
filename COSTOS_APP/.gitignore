@@ -1,0 +1,5 @@
+config_ocr.json
+*.db
+__pycache__/
+*.pyc
+.env

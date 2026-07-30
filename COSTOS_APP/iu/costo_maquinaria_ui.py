@@ -274,3 +274,42 @@ class CostoMaquinariaUI:
     def total_horas_maquina(self):
         """Suma todas las horas de máquina registradas"""
         return sum(item[1] for item in self.maquinarias_agregadas)
+
+    def cargar_desde_datos(self, maquinarias: list, disenador: str = "XAVIER CABRERA"):
+        """Carga máquinas desde OCR: lista de {maquina, hora_inicio, hora_fin}."""
+        # Agrupa por máquina sumando horas del mismo equipo
+        acumulado = {}
+        for item in maquinarias:
+            maquina = item.get("maquina")
+            hi = item.get("hora_inicio")
+            hf = item.get("hora_fin")
+            if not maquina or not hi or not hf:
+                continue
+            horas = self._convertir_a_horas_decimales(hi, hf)
+            if horas is None or horas <= 0:
+                continue
+            acumulado[maquina] = acumulado.get(maquina, 0.0) + horas
+
+        valores = list(self.combo_disenador["values"])
+        if disenador in valores:
+            self.combo_disenador.set(disenador)
+        else:
+            disenador = self.combo_disenador.get() or valores[0]
+
+        for maquina, horas_trabajo in acumulado.items():
+            if maquina not in self.combo_maquinaria["values"]:
+                continue
+            self.maquinarias_agregadas.append((maquina, horas_trabajo, disenador))
+            display_text = f"{maquina} - {self._formato_coma(horas_trabajo)} horas"
+            self.lista_maquinarias.insert(tk.END, display_text)
+            if self.on_maquinaria_agregada_callback:
+                is_laminadora = (maquina == "MAQUINA LAMINADORA")
+                self.on_maquinaria_agregada_callback(
+                    maquina_nombre=f"M.O {maquina}",
+                    horas=horas_trabajo,
+                    disenador=disenador,
+                    is_laminadora=is_laminadora,
+                )
+
+        if self.maquinarias_agregadas:
+            self._calcular_costo_total()

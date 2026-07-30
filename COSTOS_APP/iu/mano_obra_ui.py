@@ -501,3 +501,54 @@ class ManoObraUI:
             "viaticos": float(self.entry_viaticos_instalacion.get() or 0.0),
             "cif": mano_obra.calcular_cif(h_para_cif) if h_para_cif > 0 else 0.0
         }
+
+    def cargar_desde_datos(self, actividades: list, instalacion: dict | None = None):
+        """Carga actividades de operario e instalación desde OCR.
+
+        cantidad_operarios = cantidad de nombres en RESPONSABLES.
+        """
+        # Agrupa por actividad (varios días posibles)
+        por_actividad = {}
+        for item in actividades:
+            act = item.get("actividad")
+            if not act or act not in self.lista_actividades:
+                continue
+            por_actividad.setdefault(act, []).append(item)
+
+        if por_actividad:
+            self.entry_num_actividades.delete(0, tk.END)
+            self.entry_num_actividades.insert(0, str(len(por_actividad)))
+            self._generar_formulario_actividades()
+
+            for idx, (act, dias) in enumerate(por_actividad.items()):
+                act_ui = self.inputs_actividades[idx]
+                act_ui["combo_actividad"].set(act)
+                act_ui["entry_dias"].delete(0, tk.END)
+                act_ui["entry_dias"].insert(0, str(len(dias)))
+                self._generar_formulario_dias(
+                    act_ui["entry_dias"], act_ui["frame_dias"], idx
+                )
+                for j, dia in enumerate(dias):
+                    daily = act_ui["daily_inputs"][j]
+                    daily["inicio"].insert(0, dia.get("hora_inicio") or "")
+                    daily["fin"].insert(0, dia.get("hora_fin") or "")
+                    daily["operarios"].insert(0, str(dia.get("cantidad_operarios") or 1))
+
+        instalacion = instalacion or {}
+        ops = int(instalacion.get("cantidad_operarios") or 0)
+        dias_inst = instalacion.get("dias") or []
+        if ops > 0 and dias_inst:
+            self.entry_cantidad_operarios_instalacion.delete(0, tk.END)
+            self.entry_cantidad_operarios_instalacion.insert(0, str(ops))
+            viaticos = instalacion.get("viaticos") or 0
+            self.entry_viaticos_instalacion.delete(0, tk.END)
+            self.entry_viaticos_instalacion.insert(0, str(viaticos))
+            self.entry_num_dias_instalacion.delete(0, tk.END)
+            self.entry_num_dias_instalacion.insert(0, str(len(dias_inst)))
+            self._generar_formulario_dias_instalacion()
+            for j, dia in enumerate(dias_inst):
+                self.inputs_dias_instalacion[j]["inicio"].insert(0, dia.get("hora_inicio") or "")
+                self.inputs_dias_instalacion[j]["fin"].insert(0, dia.get("hora_fin") or "")
+
+        if por_actividad or (ops > 0 and dias_inst):
+            self.calcular()

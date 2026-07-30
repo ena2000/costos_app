@@ -269,3 +269,44 @@ class GastoTintaUI:
     def formato_coma(self, numero):
         """Formatea un número con coma como separador decimal."""
         return f"{numero:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    def limpiar_para_carga(self):
+        """Limpia sin mostrar error por formulario vacío."""
+        self.entry_total_medidas.delete(0, tk.END)
+        for widget in self.frame_medidas.winfo_children():
+            widget.destroy()
+        self.inputs_medidas = []
+        self.total_gasto = 0.0
+        self.resultado_formateado = ""
+        self.btn_copiar.config(state="disabled")
+        self.result_text.config(state="normal")
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.config(state="disabled")
+
+    def cargar_desde_datos(self, maquina: str, medida: dict):
+        """Carga máquina y medida de tinta desde OCR."""
+        self.limpiar_para_carga()
+        valores = list(self.combo_maquina["values"])
+        if maquina in valores:
+            self.combo_maquina.set(maquina)
+        else:
+            self.combo_maquina.current(0)
+
+        largo = float(medida.get("largo_cm") or 0)
+        ancho = float(medida.get("ancho_cm") or 0)
+        if largo <= 0 or ancho <= 0:
+            return
+
+        reps = int(medida.get("repeticiones") or 1)
+        doble = bool(medida.get("doble_cara") or False)
+
+        self.entry_total_medidas.insert(0, "1")
+        self.generar_formulario_medidas()
+        if not self.inputs_medidas:
+            return
+        entry_rep, entry_largo, entry_ancho, entry_alto, var_doble = self.inputs_medidas[0]
+        entry_rep.insert(0, str(reps))
+        entry_largo.insert(0, str(largo))
+        entry_ancho.insert(0, str(ancho))
+        var_doble.set(doble)
+        self.calcular()
