@@ -109,6 +109,11 @@ Devuelve SOLO un JSON válido (sin markdown) con esta estructura exacta:
 
 Reglas:
 - Solo incluye maquinarias/mano_obra con horas reales escritas (no filas vacías).
+- MUY IMPORTANTE maquinarias: revisa TODAS las hojas de producción.
+  * Hoja IMPRESIÓN: bloques 320, ORISS, GALAXY, CAMA PLANA, MIMAKI UV.
+  * Hoja CORTE/LAMINADO: LÁSER/CORTADORA, PLOTTER #1, PLOTTER #2, LAMINADORA.
+  * Si hay horas en 2, 3 o más máquinas, DEBES devolver TODAS en el array "maquinarias" (una entrada por cada fila con hora inicio y hora fin).
+  * No te quedes solo con la primera máquina encontrada.
 - En mano_obra, lista cada nombre de RESPONSABLES por separado; si hay varios nombres, ponlos todos en el array.
 - Si hay VARIAS medidas de impresión/señaléticas (ej. 30x10 y 60x60), incluye TODAS en medidas_tinta.
 - Preferir medidas del trabajo (ej. 140x55cm), no el ancho del rollo de vinil.

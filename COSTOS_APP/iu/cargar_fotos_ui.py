@@ -163,12 +163,15 @@ def _formatear_resumen(d: dict) -> str:
         lineas.append("Medidas: (ninguna)")
     lineas.append("")
     lineas.append("=== MAQUINARIA ===")
-    for item in d.get("maquinarias") or []:
-        lineas.append(
-            f"- {item['maquina']}: {item['hora_inicio']} → {item['hora_fin']}"
-            + (f"  ({item['fecha']})" if item.get("fecha") else "")
-        )
-    if not d.get("maquinarias"):
+    maqs = d.get("maquinarias") or []
+    if maqs:
+        lineas.append(f"Total entradas detectadas: {len(maqs)}")
+        for item in maqs:
+            lineas.append(
+                f"- {item['maquina']}: {item['hora_inicio']} → {item['hora_fin']}"
+                + (f"  ({item['fecha']})" if item.get("fecha") else "")
+            )
+    else:
         lineas.append("(ninguna)")
 
     lineas.append("")
