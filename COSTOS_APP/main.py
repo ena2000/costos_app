@@ -118,14 +118,23 @@ class App:
             
             total_final = c_maq + datos_mo["costo_mo_total"] + datos_mo["costo_ins_total"] + datos_mo["viaticos"] + datos_mo["cif"] + c_tinta + c_mat
 
-            registrar_orden([
-                self.entry_cliente.get(), self.entry_desc.get(), 
-                self.entry_fecha_inicio.get(), self.entry_fecha_fin.get(),
-                h_maq, datos_mo["horas_total"], h_tot_db, c_maq, 
-                datos_mo["costo_mo_total"], datos_mo["costo_ins_total"],
-                datos_mo["viaticos"], datos_mo["cif"], c_tinta, c_mat, total_final
-            ])
+            detalle_maquinas = self.maquinaria_ui.get_detalle_maquinas()
+            detalle_operarios = self.mano_obra_ui.get_detalle_operarios()
+
+            registrar_orden(
+                [
+                    self.entry_cliente.get(), self.entry_desc.get(),
+                    self.entry_fecha_inicio.get(), self.entry_fecha_fin.get(),
+                    h_maq, datos_mo["horas_total"], h_tot_db, c_maq,
+                    datos_mo["costo_mo_total"], datos_mo["costo_ins_total"],
+                    datos_mo["viaticos"], datos_mo["cif"], c_tinta, c_mat, total_final
+                ],
+                detalle_maquinas=detalle_maquinas,
+                detalle_operarios=detalle_operarios,
+            )
             messagebox.showinfo("Éxito", "Orden guardada en el historial.")
+            if hasattr(self, "historial_ui"):
+                self.historial_ui.cargar_datos()
         except Exception as e:
             messagebox.showerror("Error", f"Error al guardar: {e}")
 

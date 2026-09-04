@@ -36,8 +36,6 @@ def crear_tablas():
     """)
     
     # 3. TABLA ACTUALIZADA: Historial de Órdenes
-    # Se agregaron las columnas específicas de horas y desgloses de costos
-# 3. TABLA ACTUALIZADA: Historial de Órdenes
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS historial_ordenes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,6 +55,31 @@ def crear_tablas():
             costo_tinta REAL,
             costo_materiales REAL,
             costo_total_orden REAL
+        )
+    """)
+
+    # 4. Desglose de horas por máquina (y diseñador asociado)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historial_detalle_maquina (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_id INTEGER NOT NULL,
+            maquina TEXT NOT NULL,
+            operario TEXT,
+            horas REAL NOT NULL,
+            FOREIGN KEY (orden_id) REFERENCES historial_ordenes(id) ON DELETE CASCADE
+        )
+    """)
+
+    # 5. Desglose de horas por operario / actividad
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS historial_detalle_operario (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            orden_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            concepto TEXT NOT NULL,
+            operario TEXT,
+            horas REAL NOT NULL,
+            FOREIGN KEY (orden_id) REFERENCES historial_ordenes(id) ON DELETE CASCADE
         )
     """)
     

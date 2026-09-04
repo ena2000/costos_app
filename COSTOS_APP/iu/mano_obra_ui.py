@@ -502,6 +502,74 @@ class ManoObraUI:
             "cif": mano_obra.calcular_cif(h_para_cif) if h_para_cif > 0 else 0.0
         }
 
+    def get_detalle_operarios(self):
+        """Desglose para historial: horas por actividad e instalación.
+
+        Los diseñadores se guardan en detalle de máquina (no aquí) para evitar
+        duplicar horas en los reportes.
+        """
+        detalle = []
+
+        if self.horas_laminacion_total > 0:
+            detalle.append({
+                "tipo": "OPERARIO",
+                "concepto": "LAMINACION",
+                "operario": "OPERARIO LAMINACION",
+                "horas": float(self.horas_laminacion_total),
+            })
+
+        for actividad_data in self.inputs_actividades:
+            actividad_nombre = actividad_data["combo_actividad"].get()
+            if not actividad_nombre:
+                continue
+            total_horas_actividad = 0.0
+            for daily_input in actividad_data["daily_inputs"]:
+                try:
+                    inicio = daily_input["inicio"].get()
+                    fin = daily_input["fin"].get()
+                    operarios = int(daily_input["operarios"].get() or 0)
+                    almuerzo_marcado = daily_input["almuerzo_var"].get()
+                    horas_decimales = self._convertir_a_horas_decimales(inicio, fin)
+                    if horas_decimales is None or operarios <= 0:
+                        continue
+                    if almuerzo_marcado and horas_decimales > 0.5:
+                        horas_decimales -= 0.5
+                    total_horas_actividad += horas_decimales * operarios
+                except Exception:
+                    continue
+            if total_horas_actividad > 0:
+                detalle.append({
+                    "tipo": "OPERARIO",
+                    "concepto": actividad_nombre,
+                    "operario": f"OPERARIO {actividad_nombre}",
+                    "horas": float(total_horas_actividad),
+                })
+
+        try:
+            cantidad_operarios = int(self.entry_cantidad_operarios_instalacion.get() or 0)
+            total_horas_por_operario = 0.0
+            for dia_input in self.inputs_dias_instalacion:
+                horas_decimales = self._convertir_a_horas_decimales(
+                    dia_input["inicio"].get(), dia_input["fin"].get()
+                )
+                if horas_decimales is None:
+                    continue
+                if dia_input["almuerzo_var"].get() and horas_decimales > 0.5:
+                    horas_decimales -= 0.5
+                total_horas_por_operario += horas_decimales
+            total_inst = total_horas_por_operario * cantidad_operarios
+            if total_inst > 0:
+                detalle.append({
+                    "tipo": "INSTALACION",
+                    "concepto": "INSTALACION",
+                    "operario": "OPERARIO INSTALACION",
+                    "horas": float(total_inst),
+                })
+        except Exception:
+            pass
+
+        return detalle
+
     def cargar_desde_datos(self, actividades: list, instalacion: dict | None = None):
         """Carga actividades de operario e instalación desde OCR.
 

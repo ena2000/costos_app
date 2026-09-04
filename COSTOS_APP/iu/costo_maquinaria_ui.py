@@ -275,6 +275,13 @@ class CostoMaquinariaUI:
         """Suma todas las horas de máquina registradas"""
         return sum(item[1] for item in self.maquinarias_agregadas)
 
+    def get_detalle_maquinas(self):
+        """Desglose para historial: horas por máquina y diseñador."""
+        return [
+            {"maquina": maquina, "operario": disenador, "horas": float(horas)}
+            for maquina, horas, disenador in self.maquinarias_agregadas
+        ]
+
     def cargar_desde_datos(self, maquinarias: list, disenador: str = "XAVIER CABRERA"):
         """Carga máquinas desde OCR: lista de {maquina, hora_inicio, hora_fin}."""
         # Agrupa por máquina sumando horas del mismo equipo
