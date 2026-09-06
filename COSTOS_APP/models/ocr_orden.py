@@ -11,7 +11,10 @@ from pathlib import Path
 import requests
 from PIL import Image
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config_ocr.json"
+from models.rutas import archivo_datos
+from models.fechas import normalizar as _normalizar_fecha_comun
+
+CONFIG_PATH = archivo_datos("config_ocr.json")
 GEMINI_MODELS = (
     "gemini-2.5-flash-lite",
     "gemini-2.0-flash-lite",
@@ -384,8 +387,8 @@ def _norm_fecha(valor) -> str:
     if m:
         d, mes = m.group(1), m.group(2)[:3].lower()
         mo = meses.get(mes, "01")
-        return f"{int(d):02d}/{mo}"
-    return s
+        return _normalizar_fecha_comun(f"{int(d):02d}/{mo}")
+    return _normalizar_fecha_comun(s)
 
 
 def normalizar_datos(raw: dict) -> dict:
@@ -426,7 +429,7 @@ def normalizar_datos(raw: dict) -> dict:
                 "maquina": maq,
                 "hora_inicio": hi,
                 "hora_fin": hf,
-                "fecha": item.get("fecha") or "",
+                "fecha": _norm_fecha(item.get("fecha")),
                 "responsable": item.get("responsable") or "",
             })
 
@@ -440,7 +443,7 @@ def normalizar_datos(raw: dict) -> dict:
         if act and hi and hf and ops > 0:
             mano_obra.append({
                 "actividad": act,
-                "fecha": item.get("fecha") or "",
+                "fecha": _norm_fecha(item.get("fecha")),
                 "hora_inicio": hi,
                 "hora_fin": hf,
                 "responsables": responsables if isinstance(responsables, list) else [str(responsables)],
@@ -453,7 +456,11 @@ def normalizar_datos(raw: dict) -> dict:
         hi = _norm_hora(d.get("hora_inicio"))
         hf = _norm_hora(d.get("hora_fin"))
         if hi and hf:
-            dias_inst.append({"hora_inicio": hi, "hora_fin": hf})
+            dias_inst.append({
+                "hora_inicio": hi,
+                "hora_fin": hf,
+                "fecha": _norm_fecha(d.get("fecha")),
+            })
 
     materiales = []
     for mat in raw.get("materiales") or []:

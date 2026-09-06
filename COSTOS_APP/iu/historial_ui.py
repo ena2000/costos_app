@@ -39,11 +39,9 @@ class HistorialUI:
         self.resumen_frame = ttk.LabelFrame(self.root, text=" Resumen de horas (rango seleccionado) ", padding=10)
         self.resumen_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
 
-        self.lbl_horas = ttk.Label(self.resumen_frame, text="Horas totales: 0.00", font=("Segoe UI", 11, "bold"))
-        self.lbl_horas.pack(side="left", padx=15)
-        self.lbl_maq = ttk.Label(self.resumen_frame, text="Hrs máquina: 0.00")
+        self.lbl_maq = ttk.Label(self.resumen_frame, text="Total hrs máquina: 0.00", font=("Segoe UI", 11, "bold"))
         self.lbl_maq.pack(side="left", padx=15)
-        self.lbl_mo = ttk.Label(self.resumen_frame, text="Hrs mano obra: 0.00")
+        self.lbl_mo = ttk.Label(self.resumen_frame, text="Total hrs operario: 0.00", font=("Segoe UI", 11, "bold"))
         self.lbl_mo.pack(side="left", padx=15)
 
         ttk.Button(self.resumen_frame, text="Exportar desglose Excel", command=self.exportar_excel).pack(side="right", padx=5)
@@ -85,8 +83,8 @@ class HistorialUI:
             "cliente": ("Cliente", 140),
             "descripcion": ("Trabajo", 200),
             "h_maq": ("Hrs Máq.", 80),
-            "h_mo": ("Hrs M.O.", 80),
-            "horas": ("Hrs Tot.", 80),
+            "h_mo": ("Hrs Operario", 90),
+            "horas": ("Suma hrs", 80),
             "total": ("Total $", 90),
         }
         for col, (titulo, ancho) in headings.items():
@@ -106,8 +104,8 @@ class HistorialUI:
             ("mes", "Mes", 160),
             ("ordenes", "Órdenes", 80),
             ("h_maq", "Hrs Máquina", 110),
-            ("h_mo", "Hrs M.O.", 110),
-            ("h_tot", "Hrs Totales", 110),
+            ("h_mo", "Hrs Operario", 110),
+            ("h_tot", "Suma hrs", 110),
         ):
             self.tree_mes.heading(col, text=titulo)
             self.tree_mes.column(col, width=w, anchor="center")
@@ -224,9 +222,8 @@ class HistorialUI:
                 detalle or "-",
             ))
 
-        self.lbl_horas.config(text=f"Horas totales: {desglose['horas_totales']:.2f}")
-        self.lbl_maq.config(text=f"Hrs máquina: {desglose['horas_maquina']:.2f}")
-        self.lbl_mo.config(text=f"Hrs mano obra: {desglose['horas_mano_obra']:.2f}")
+        self.lbl_maq.config(text=f"Total hrs máquina: {desglose['horas_maquina']:.2f}")
+        self.lbl_mo.config(text=f"Total hrs operario: {desglose['horas_mano_obra']:.2f}")
 
     def exportar_excel(self):
         """Exporta horas totales + desglose por mes, máquina y operario."""
@@ -250,9 +247,9 @@ class HistorialUI:
             from openpyxl.styles import Font, PatternFill, Alignment
 
             df_resumen = pd.DataFrame([
-                {"Concepto": "Horas totales", "Valor": round(desglose["horas_totales"], 2)},
-                {"Concepto": "Horas máquina", "Valor": round(desglose["horas_maquina"], 2)},
-                {"Concepto": "Horas mano de obra", "Valor": round(desglose["horas_mano_obra"], 2)},
+                {"Concepto": "Total hrs máquina", "Valor": round(desglose["horas_maquina"], 2)},
+                {"Concepto": "Total hrs operario", "Valor": round(desglose["horas_mano_obra"], 2)},
+                {"Concepto": "Suma hrs (máquina + operario)", "Valor": round(desglose["horas_totales"], 2)},
                 {"Concepto": "Órdenes en rango", "Valor": len(desglose["ordenes"])},
                 {"Concepto": "Fecha desde", "Valor": desde or "(todas)"},
                 {"Concepto": "Fecha hasta", "Valor": hasta or "(todas)"},
@@ -263,8 +260,8 @@ class HistorialUI:
                     "Mes": m.get("etiqueta"),
                     "Órdenes": m.get("ordenes"),
                     "Hrs Máquina": round(m.get("horas_maquina", 0), 2),
-                    "Hrs M.O.": round(m.get("horas_mo", 0), 2),
-                    "Hrs Totales": round(m.get("horas_totales", 0), 2),
+                    "Hrs Operario": round(m.get("horas_mo", 0), 2),
+                    "Suma hrs": round(m.get("horas_totales", 0), 2),
                 }
                 for m in desglose["por_mes"]
             ])
@@ -319,8 +316,8 @@ class HistorialUI:
                     "Cliente": o["cliente"],
                     "Trabajo": o["descripcion"],
                     "Hrs Máquina": round(o["horas_maquina"], 2),
-                    "Hrs M.O.": round(o["horas_mano_obra"], 2),
-                    "Hrs Totales": round(o["horas_totales"], 2),
+                    "Hrs Operario": round(o["horas_mano_obra"], 2),
+                    "Suma hrs": round(o["horas_totales"], 2),
                     "Total $": round(o["costo_total"], 2),
                 }
                 for o in desglose["ordenes"]

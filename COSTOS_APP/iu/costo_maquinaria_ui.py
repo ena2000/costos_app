@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from models.costo_maquinaria import CostoMaquinaria
+from models.fechas import hoy_str, normalizar
 from datetime import datetime, timedelta
 
 class CostoMaquinariaUI:
@@ -119,23 +120,29 @@ class CostoMaquinariaUI:
         for i in range(num_dias):
             dia_frame = ttk.Frame(self.frame_dias_maquinaria)
             dia_frame.pack(pady=3, fill="x", expand=True)
-            
-            ttk.Label(dia_frame, text=f"Día #{i+1} - Hora Inicio (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text=f"Día #{i+1}  Fecha:").pack(side="left")
+            entry_fecha = ttk.Entry(dia_frame, width=12)
+            entry_fecha.insert(0, hoy_str())
+            entry_fecha.pack(side="left", padx=5)
+
+            ttk.Label(dia_frame, text="Inicio (HH:MM):").pack(side="left")
             entry_inicio = ttk.Entry(dia_frame, width=8)
             entry_inicio.pack(side="left", padx=5)
-            
-            ttk.Label(dia_frame, text="Hora Fin (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text="Fin (HH:MM):").pack(side="left")
             entry_fin = ttk.Entry(dia_frame, width=8)
             entry_fin.pack(side="left", padx=5)
-            
+
             var_almuerzo_dia = tk.BooleanVar()
             check_almuerzo = ttk.Checkbutton(dia_frame, text="Almuerzo (0.5h)", variable=var_almuerzo_dia)
             check_almuerzo.pack(side="left", padx=5)
-            
+
             self.inputs_dias_maquinaria.append({
-                "inicio": entry_inicio, 
-                "fin": entry_fin, 
-                "almuerzo_var": var_almuerzo_dia
+                "fecha": entry_fecha,
+                "inicio": entry_inicio,
+                "fin": entry_fin,
+                "almuerzo_var": var_almuerzo_dia,
             })
 
     def _agregar_maquinaria(self):
@@ -147,11 +154,12 @@ class CostoMaquinariaUI:
                 messagebox.showerror("Error", "Por favor, genere las entradas de horas y complete los datos.")
                 return
 
-            horas_trabajo_total = 0
+            dias_agregados = []
             for i, dia_input in enumerate(self.inputs_dias_maquinaria):
                 inicio_str = dia_input["inicio"].get()
                 fin_str = dia_input["fin"].get()
                 almuerzo_marcado = dia_input["almuerzo_var"].get()
+                fecha = normalizar(dia_input["fecha"].get()) or hoy_str()
 
                 if not inicio_str or not fin_str:
                     messagebox.showerror("Error", f"Día #{i+1}: Por favor, complete la hora de inicio y fin.")
@@ -165,32 +173,36 @@ class CostoMaquinariaUI:
                 if almuerzo_marcado:
                     if horas_decimales > 0.5:
                         horas_decimales -= 0.5
-                
-                horas_trabajo_total += horas_decimales
 
-            if horas_trabajo_total <= 0:
+                if horas_decimales <= 0:
+                    messagebox.showerror("Error", f"Día #{i+1}: las horas deben ser mayores a cero.")
+                    return
+
+                dias_agregados.append({"horas": horas_decimales, "fecha": fecha})
+
+            if not dias_agregados:
                 messagebox.showerror("Error", "El total de horas de trabajo debe ser mayor a cero.")
                 return
 
-            horas_trabajo = horas_trabajo_total
+            is_laminadora = (maquina == "MAQUINA LAMINADORA")
+            for dia in dias_agregados:
+                horas_trabajo = dia["horas"]
+                fecha = dia["fecha"]
+                self.maquinarias_agregadas.append((maquina, horas_trabajo, disenador, fecha))
+                display_text = f"{fecha} | {maquina} - {self._formato_coma(horas_trabajo)} horas"
+                self.lista_maquinarias.insert(tk.END, display_text)
+                if self.on_maquinaria_agregada_callback:
+                    self.on_maquinaria_agregada_callback(
+                        maquina_nombre=f"M.O {maquina}",
+                        horas=horas_trabajo,
+                        disenador=disenador,
+                        is_laminadora=is_laminadora,
+                    )
 
-            self.maquinarias_agregadas.append((maquina, horas_trabajo, disenador))
-            display_text = f"{maquina} - {self._formato_coma(horas_trabajo)} horas"
-            self.lista_maquinarias.insert(tk.END, display_text)
-            
             self.entry_num_dias.delete(0, tk.END)
             for widget in self.frame_dias_maquinaria.winfo_children():
                 widget.destroy()
             self.inputs_dias_maquinaria = []
-
-            if self.on_maquinaria_agregada_callback:
-                is_laminadora = (maquina == "MAQUINA LAMINADORA")
-                self.on_maquinaria_agregada_callback(
-                    maquina_nombre=f"M.O {maquina}",
-                    horas=horas_trabajo,
-                    disenador=disenador,
-                    is_laminadora=is_laminadora
-                )
         except ValueError:
             messagebox.showerror("Error", "Error en los valores ingresados.")
         except Exception as e:
@@ -210,7 +222,7 @@ class CostoMaquinariaUI:
         self.text_resultado.insert(tk.END, "=== COSTO TOTAL POR MAQUINARIA ===\n\n")
         
         maquinaria_calculada = []
-        for maquina, horas_trabajo, _ in self.maquinarias_agregadas:
+        for maquina, horas_trabajo, *_rest in self.maquinarias_agregadas:
             try:
                 costo = CostoMaquinaria(maquina, horas_trabajo).calcular_costo()
                 maquinaria_calculada.append({'maquina': maquina, 'horas': horas_trabajo, 'costo': costo})
@@ -264,7 +276,7 @@ class CostoMaquinariaUI:
     def total_costo_maquinaria(self):
         """Suma el costo de todas las máquinas agregadas a la lista"""
         total = 0.0
-        for maquina, horas, _ in self.maquinarias_agregadas:
+        for maquina, horas, *_rest in self.maquinarias_agregadas:
             # Usamos la clase CostoMaquinaria que ya importaste al inicio del archivo
             costo = CostoMaquinaria(maquina, horas).calcular_costo()
             total += costo
@@ -276,44 +288,47 @@ class CostoMaquinariaUI:
         return sum(item[1] for item in self.maquinarias_agregadas)
 
     def get_detalle_maquinas(self):
-        """Desglose para historial: horas por máquina y diseñador."""
-        return [
-            {"maquina": maquina, "operario": disenador, "horas": float(horas)}
-            for maquina, horas, disenador in self.maquinarias_agregadas
-        ]
+        """Desglose para historial: horas por máquina, diseñador y fecha."""
+        detalle = []
+        for item in self.maquinarias_agregadas:
+            maquina, horas, disenador, *rest = item
+            fecha = rest[0] if rest else ""
+            detalle.append({
+                "maquina": maquina,
+                "operario": disenador,
+                "horas": float(horas),
+                "fecha": fecha or "",
+            })
+        return detalle
 
     def cargar_desde_datos(self, maquinarias: list, disenador: str = "XAVIER CABRERA"):
-        """Carga máquinas desde OCR: lista de {maquina, hora_inicio, hora_fin}."""
-        # Agrupa por máquina sumando horas del mismo equipo
-        acumulado = {}
-        for item in maquinarias:
-            maquina = item.get("maquina")
-            hi = item.get("hora_inicio")
-            hf = item.get("hora_fin")
-            if not maquina or not hi or not hf:
-                continue
-            horas = self._convertir_a_horas_decimales(hi, hf)
-            if horas is None or horas <= 0:
-                continue
-            acumulado[maquina] = acumulado.get(maquina, 0.0) + horas
-
+        """Carga máquinas desde OCR: lista de {maquina, hora_inicio, hora_fin, fecha}."""
         valores = list(self.combo_disenador["values"])
         if disenador in valores:
             self.combo_disenador.set(disenador)
         else:
             disenador = self.combo_disenador.get() or valores[0]
 
-        for maquina, horas_trabajo in acumulado.items():
+        for item in maquinarias:
+            maquina = item.get("maquina")
+            hi = item.get("hora_inicio")
+            hf = item.get("hora_fin")
+            if not maquina or not hi or not hf:
+                continue
             if maquina not in self.combo_maquinaria["values"]:
                 continue
-            self.maquinarias_agregadas.append((maquina, horas_trabajo, disenador))
-            display_text = f"{maquina} - {self._formato_coma(horas_trabajo)} horas"
+            horas = self._convertir_a_horas_decimales(hi, hf)
+            if horas is None or horas <= 0:
+                continue
+            fecha = normalizar(item.get("fecha")) or hoy_str()
+            self.maquinarias_agregadas.append((maquina, horas, disenador, fecha))
+            display_text = f"{fecha} | {maquina} - {self._formato_coma(horas)} horas"
             self.lista_maquinarias.insert(tk.END, display_text)
             if self.on_maquinaria_agregada_callback:
                 is_laminadora = (maquina == "MAQUINA LAMINADORA")
                 self.on_maquinaria_agregada_callback(
                     maquina_nombre=f"M.O {maquina}",
-                    horas=horas_trabajo,
+                    horas=horas,
                     disenador=disenador,
                     is_laminadora=is_laminadora,
                 )
