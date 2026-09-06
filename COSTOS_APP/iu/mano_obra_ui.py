@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from models import mano_obra
+from models.fechas import hoy_str, normalizar
 from itertools import combinations
 from datetime import datetime, timedelta
 from functools import partial
@@ -170,28 +171,34 @@ class ManoObraUI:
         for i in range(num_dias):
             dia_frame = ttk.Frame(frame_dias_widget)
             dia_frame.pack(pady=3, fill="x", expand=True)
-            
-            ttk.Label(dia_frame, text=f"Día #{i+1} - Hora Inicio (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text=f"Día #{i+1}  Fecha:").pack(side="left")
+            entry_fecha = ttk.Entry(dia_frame, width=12)
+            entry_fecha.insert(0, hoy_str())
+            entry_fecha.pack(side="left", padx=5)
+
+            ttk.Label(dia_frame, text="Inicio (HH:MM):").pack(side="left")
             entry_inicio = ttk.Entry(dia_frame, width=8)
             entry_inicio.pack(side="left", padx=5)
-            
-            ttk.Label(dia_frame, text="Hora Fin (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text="Fin (HH:MM):").pack(side="left")
             entry_fin = ttk.Entry(dia_frame, width=8)
             entry_fin.pack(side="left", padx=5)
-            
+
             ttk.Label(dia_frame, text="Cant. de Operarios:").pack(side="left")
             entry_operarios = ttk.Entry(dia_frame, width=8)
             entry_operarios.pack(side="left", padx=5)
-            
+
             var_almuerzo_dia = tk.BooleanVar()
             check_almuerzo = ttk.Checkbutton(dia_frame, text="Almuerzo (0.5h)", variable=var_almuerzo_dia)
             check_almuerzo.pack(side="left", padx=5)
-            
+
             self.inputs_actividades[actividad_index]["daily_inputs"].append({
-                "inicio": entry_inicio, 
-                "fin": entry_fin, 
+                "fecha": entry_fecha,
+                "inicio": entry_inicio,
+                "fin": entry_fin,
                 "operarios": entry_operarios,
-                "almuerzo_var": var_almuerzo_dia
+                "almuerzo_var": var_almuerzo_dia,
             })
         self.canvas_operario.update_idletasks()
         self.canvas_operario.config(scrollregion=self.canvas_operario.bbox("all"))
@@ -211,23 +218,29 @@ class ManoObraUI:
         for i in range(num_dias):
             dia_frame = ttk.Frame(self.frame_dias_instalacion)
             dia_frame.pack(pady=3, fill="x", expand=True)
-            
-            ttk.Label(dia_frame, text=f"Día #{i+1} - Hora Inicio (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text=f"Día #{i+1}  Fecha:").pack(side="left")
+            entry_fecha = ttk.Entry(dia_frame, width=12)
+            entry_fecha.insert(0, hoy_str())
+            entry_fecha.pack(side="left", padx=5)
+
+            ttk.Label(dia_frame, text="Inicio (HH:MM):").pack(side="left")
             entry_inicio = ttk.Entry(dia_frame, width=8)
             entry_inicio.pack(side="left", padx=5)
-            
-            ttk.Label(dia_frame, text="Hora Fin (HH:MM):").pack(side="left")
+
+            ttk.Label(dia_frame, text="Fin (HH:MM):").pack(side="left")
             entry_fin = ttk.Entry(dia_frame, width=8)
             entry_fin.pack(side="left", padx=5)
-            
+
             var_almuerzo_dia = tk.BooleanVar()
             check_almuerzo = ttk.Checkbutton(dia_frame, text="Almuerzo (0.5h)", variable=var_almuerzo_dia)
             check_almuerzo.pack(side="left", padx=5)
-            
+
             self.inputs_dias_instalacion.append({
-                "inicio": entry_inicio, 
-                "fin": entry_fin, 
-                "almuerzo_var": var_almuerzo_dia
+                "fecha": entry_fecha,
+                "inicio": entry_inicio,
+                "fin": entry_fin,
+                "almuerzo_var": var_almuerzo_dia,
             })
 
     def _convertir_a_horas_decimales(self, inicio_str, fin_str):
@@ -516,13 +529,13 @@ class ManoObraUI:
                 "concepto": "LAMINACION",
                 "operario": "OPERARIO LAMINACION",
                 "horas": float(self.horas_laminacion_total),
+                "fecha": "",
             })
 
         for actividad_data in self.inputs_actividades:
             actividad_nombre = actividad_data["combo_actividad"].get()
             if not actividad_nombre:
                 continue
-            total_horas_actividad = 0.0
             for daily_input in actividad_data["daily_inputs"]:
                 try:
                     inicio = daily_input["inicio"].get()
@@ -534,20 +547,23 @@ class ManoObraUI:
                         continue
                     if almuerzo_marcado and horas_decimales > 0.5:
                         horas_decimales -= 0.5
-                    total_horas_actividad += horas_decimales * operarios
+                    total_dia = horas_decimales * operarios
+                    if total_dia <= 0:
+                        continue
+                    fecha_widget = daily_input.get("fecha")
+                    fecha = normalizar(fecha_widget.get()) if fecha_widget else ""
+                    detalle.append({
+                        "tipo": "OPERARIO",
+                        "concepto": actividad_nombre,
+                        "operario": f"OPERARIO {actividad_nombre}",
+                        "horas": float(total_dia),
+                        "fecha": fecha,
+                    })
                 except Exception:
                     continue
-            if total_horas_actividad > 0:
-                detalle.append({
-                    "tipo": "OPERARIO",
-                    "concepto": actividad_nombre,
-                    "operario": f"OPERARIO {actividad_nombre}",
-                    "horas": float(total_horas_actividad),
-                })
 
         try:
             cantidad_operarios = int(self.entry_cantidad_operarios_instalacion.get() or 0)
-            total_horas_por_operario = 0.0
             for dia_input in self.inputs_dias_instalacion:
                 horas_decimales = self._convertir_a_horas_decimales(
                     dia_input["inicio"].get(), dia_input["fin"].get()
@@ -556,14 +572,17 @@ class ManoObraUI:
                     continue
                 if dia_input["almuerzo_var"].get() and horas_decimales > 0.5:
                     horas_decimales -= 0.5
-                total_horas_por_operario += horas_decimales
-            total_inst = total_horas_por_operario * cantidad_operarios
-            if total_inst > 0:
+                total_dia = horas_decimales * cantidad_operarios
+                if total_dia <= 0:
+                    continue
+                fecha_widget = dia_input.get("fecha")
+                fecha = normalizar(fecha_widget.get()) if fecha_widget else ""
                 detalle.append({
                     "tipo": "INSTALACION",
                     "concepto": "INSTALACION",
                     "operario": "OPERARIO INSTALACION",
-                    "horas": float(total_inst),
+                    "horas": float(total_dia),
+                    "fecha": fecha,
                 })
         except Exception:
             pass
@@ -601,6 +620,9 @@ class ManoObraUI:
                     daily["inicio"].insert(0, dia.get("hora_inicio") or "")
                     daily["fin"].insert(0, dia.get("hora_fin") or "")
                     daily["operarios"].insert(0, str(dia.get("cantidad_operarios") or 1))
+                    fecha = normalizar(dia.get("fecha")) or hoy_str()
+                    daily["fecha"].delete(0, tk.END)
+                    daily["fecha"].insert(0, fecha)
 
         instalacion = instalacion or {}
         ops = int(instalacion.get("cantidad_operarios") or 0)
@@ -617,6 +639,9 @@ class ManoObraUI:
             for j, dia in enumerate(dias_inst):
                 self.inputs_dias_instalacion[j]["inicio"].insert(0, dia.get("hora_inicio") or "")
                 self.inputs_dias_instalacion[j]["fin"].insert(0, dia.get("hora_fin") or "")
+                fecha = normalizar(dia.get("fecha")) or hoy_str()
+                self.inputs_dias_instalacion[j]["fecha"].delete(0, tk.END)
+                self.inputs_dias_instalacion[j]["fecha"].insert(0, fecha)
 
         if por_actividad or (ops > 0 and dias_inst):
             self.calcular()

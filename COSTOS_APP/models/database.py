@@ -68,6 +68,7 @@ def crear_tablas():
             maquina TEXT NOT NULL,
             operario TEXT,
             horas REAL NOT NULL,
+            fecha TEXT,
             FOREIGN KEY (orden_id) REFERENCES historial_ordenes(id) ON DELETE CASCADE
         )
     """)
@@ -81,12 +82,22 @@ def crear_tablas():
             concepto TEXT NOT NULL,
             operario TEXT,
             horas REAL NOT NULL,
+            fecha TEXT,
             FOREIGN KEY (orden_id) REFERENCES historial_ordenes(id) ON DELETE CASCADE
         )
     """)
     
     # Insertar un registro inicial para la sincronización si no existe
     cursor.execute("INSERT OR IGNORE INTO sync_info (id, last_sync_time) VALUES (1, 0)")
+
+    def _asegurar_columna(tabla, columna, tipo):
+        cursor.execute(f"PRAGMA table_info({tabla})")
+        existentes = {fila[1] for fila in cursor.fetchall()}
+        if columna not in existentes:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+
+    _asegurar_columna("historial_detalle_maquina", "fecha", "TEXT")
+    _asegurar_columna("historial_detalle_operario", "fecha", "TEXT")
     
     conn.commit()
     conn.close()
