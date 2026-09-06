@@ -38,8 +38,6 @@ def calcular_manodeobra_operario(actividad: str, horas_empleadas: float, cantida
 
 # Cálculo de CIF (MODIFICADO)
 def calcular_cif(tiempo_total_obra: float):
-    """
-    Calcula el CIF dividiendo las horas totales entre 5 y multiplicando 
-    por el valor CIF por hora.
-    """
-    return (tiempo_total_obra / 5) * valor_cif_por_hora
+    """CIF = (horas de obra / divisor) × valor CIF por hora."""
+    from models import tarifas
+    return tarifas.calcular_cif(tiempo_total_obra)

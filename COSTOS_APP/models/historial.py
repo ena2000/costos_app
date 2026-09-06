@@ -176,9 +176,9 @@ def consultar_horas_desglose(fecha_desde=None, fecha_hasta=None):
         dt = _parse_fecha(r[1]) or _parse_fecha(str(r[9])[:10] if r[9] else None)
         orden_fecha[r[0]] = dt
 
-    horas_totales = sum((r[7] or 0) for r in ordenes)
     horas_maquina = sum((r[5] or 0) for r in ordenes)
     horas_mano_obra = sum((r[6] or 0) for r in ordenes)
+    horas_totales = horas_maquina + horas_mano_obra
 
     dt_desde = _parse_fecha(fecha_desde) if fecha_desde else None
     dt_hasta = _parse_fecha(fecha_hasta) if fecha_hasta else None
@@ -305,7 +305,7 @@ def consultar_horas_desglose(fecha_desde=None, fecha_hasta=None):
                 "descripcion": r[4],
                 "horas_maquina": r[5] or 0,
                 "horas_mano_obra": r[6] or 0,
-                "horas_totales": r[7] or 0,
+                "horas_totales": (r[5] or 0) + (r[6] or 0),
                 "costo_total": r[8] or 0,
             }
             for r in ordenes

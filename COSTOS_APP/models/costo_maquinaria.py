@@ -17,11 +17,8 @@ class CostoMaquinaria:
         self.horas_trabajo = horas_trabajo
 
     def calcular_costo(self):
-        # Obtener el costo por hora de la máquina seleccionada
-        if self.maquina not in self.costos_maquinas:
-            raise ValueError("Maquinaria no válida.")
-        
-        costo_hora = self.costos_maquinas[self.maquina]
-        # Calcular el costo total de la máquina según las horas de trabajo
+        from models import tarifas
+
+        costo_hora = tarifas.costo_maquina(self.maquina)
         costo_total = costo_hora * self.horas_trabajo
         return round(costo_total, 2)

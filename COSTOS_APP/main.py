@@ -10,6 +10,7 @@ from iu.gasto_tinta_ui import GastoTintaUI
 from iu.costo_materiales_ui import CostoMaterialesUI
 from iu.inventario_ui import InventarioUI
 from iu.historial_ui import HistorialUI
+from iu.tarifas_ui import TarifasUI
 from iu.cargar_fotos_ui import CargarFotosDialog, aplicar_datos_a_app
 
 # Importación de modelos y base de datos
@@ -23,6 +24,8 @@ class App:
         self.root.geometry("950x700") 
 
         database.crear_tablas()
+        from models import tarifas
+        tarifas.cargar()
 
         style = ttk.Style()
         style.configure(".", font=("Segoe UI", 9))
@@ -74,6 +77,7 @@ class App:
         self.materiales_ui = CostoMaterialesUI(ttk.Frame(self.notebook))
         self.inventario_ui = InventarioUI(ttk.Frame(self.notebook))
         self.historial_ui = HistorialUI(ttk.Frame(self.notebook))
+        self.tarifas_ui = TarifasUI(ttk.Frame(self.notebook))
 
         self.notebook.add(self.maquinaria_ui.root, text="⚙️ Maquinaria")
         self.notebook.add(self.mano_obra_ui.master, text="👥 Mano de Obra")
@@ -81,6 +85,7 @@ class App:
         self.notebook.add(self.materiales_ui.main_frame, text="📦 Materiales")
         self.notebook.add(self.inventario_ui.root, text="🔍 Inventario")
         self.notebook.add(self.historial_ui.root, text="📜 Historial")
+        self.notebook.add(self.tarifas_ui.root, text="💲 Tarifas")
 
         btn_frame = ttk.Frame(self.root, padding="10")
         btn_frame.grid(row=2, column=0, sticky="ew")

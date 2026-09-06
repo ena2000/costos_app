@@ -1,4 +1,5 @@
 config_ocr.json
+tarifas.json
 *.db
 __pycache__/
 *.pyc
