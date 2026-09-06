@@ -19,8 +19,14 @@ def directorio_datos() -> Path:
     """
     if _esta_empaquetada():
         exe_dir = Path(sys.executable).resolve().parent
-        if (exe_dir / "inventario_app.db").exists() or (exe_dir / "portable.txt").exists():
-            return exe_dir
+        candidatos = (
+            exe_dir,
+            exe_dir / "PUBLISTIK" / "CostosApp",
+            exe_dir / "CostosApp",
+        )
+        for carpeta in candidatos:
+            if (carpeta / "inventario_app.db").exists() or (carpeta / "portable.txt").exists():
+                return carpeta
         dest = Path(os.environ.get("APPDATA", str(Path.home()))) / "PUBLISTIK" / "CostosApp"
         dest.mkdir(parents=True, exist_ok=True)
         return dest

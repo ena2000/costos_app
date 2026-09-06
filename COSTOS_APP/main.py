@@ -29,7 +29,8 @@ class App:
 
         style = ttk.Style()
         style.configure(".", font=("Segoe UI", 9))
-        style.configure("TNotebook.Tab", padding=[8, 2]) 
+        style.configure("TNotebook.Tab", padding=[8, 2])
+        style.configure("Copiar.TButton", font=("Segoe UI", 9)) 
         
         self.setup_ui()
 
@@ -91,10 +92,28 @@ class App:
         btn_frame.grid(row=2, column=0, sticky="ew")
 
         ttk.Button(btn_frame, text="🗑️ Limpiar Todo", command=self.limpiar_todo).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="📋 Copiar para Excel", command=self.copiar_resultado).pack(side="right", padx=5)
+        ttk.Button(
+            btn_frame,
+            text="Solo copiar a Excel (no guarda)",
+            command=self.copiar_resultado,
+            style="Copiar.TButton",
+        ).pack(side="right", padx=5)
 
         ttk.Button(btn_frame, text="📷 Cargar fotos de orden", command=self.abrir_cargar_fotos).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="💾 FINALIZAR Y GUARDAR", command=self.ejecutar_finalizado_completo).pack(side="left", padx=5)
+        tk.Button(
+            btn_frame,
+            text="💾  GUARDAR Y COPIAR",
+            command=self.ejecutar_finalizado_completo,
+            bg="#1565C0",
+            fg="white",
+            activebackground="#0D47A1",
+            activeforeground="white",
+            font=("Segoe UI", 10, "bold"),
+            relief="raised",
+            padx=14,
+            pady=5,
+            cursor="hand2",
+        ).pack(side="left", padx=5)
 
     def abrir_cargar_fotos(self):
         CargarFotosDialog(self.root, on_aplicar=lambda datos: aplicar_datos_a_app(self, datos))
