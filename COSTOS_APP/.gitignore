@@ -3,3 +3,6 @@ config_ocr.json
 __pycache__/
 *.pyc
 .env
+build/
+dist/
+*.exe

@@ -5,7 +5,9 @@ import pandas as pd
 import os
 import datetime
 
-DB_FILE = "inventario_app.db"
+from models.rutas import archivo_datos
+
+DB_FILE = str(archivo_datos("inventario_app.db"))
 
 def obtener_conexion():
     """Crea y devuelve una conexión a la base de datos SQLite."""

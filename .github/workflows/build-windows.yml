@@ -1,0 +1,58 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        working-directory: COSTOS_APP
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Empaquetar .exe
+        working-directory: COSTOS_APP
+        run: python -m PyInstaller --noconfirm --clean costos_app.spec
+
+      - name: Subir artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: CalculadoraCostos-PUBLISTIK
+          path: COSTOS_APP/dist/CalculadoraCostos-PUBLISTIK.exe
+          if-no-files-found: error
+
+      - name: Publicar Release (etiqueta v*)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: COSTOS_APP/dist/CalculadoraCostos-PUBLISTIK.exe
+          generate_release_notes: true
+
+      - name: Publicar descarga en Releases
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Descargar app (última versión)
+          files: COSTOS_APP/dist/CalculadoraCostos-PUBLISTIK.exe
+          body: |
+            Descarga **CalculadoraCostos-PUBLISTIK.exe** y ábrela con doble clic.
+
+            Si Windows muestra “Windows protegió tu PC”, elige **Más información** → **Ejecutar de todas formas**.
+          make_latest: true

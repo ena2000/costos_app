@@ -11,7 +11,9 @@ from pathlib import Path
 import requests
 from PIL import Image
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config_ocr.json"
+from models.rutas import archivo_datos
+
+CONFIG_PATH = archivo_datos("config_ocr.json")
 GEMINI_MODELS = (
     "gemini-2.5-flash-lite",
     "gemini-2.0-flash-lite",
